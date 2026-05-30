@@ -56,7 +56,6 @@ with col1:
         difficulty = st.slider("난이도", 1, 5, 3)
         weakness = st.slider("취약도", 1, 5, 3)
         weak_unit = st.text_input("취약 단원", placeholder="예: 함수, 문법, 독해")
-        # 사용자가 선택한 색상을 수집합니다
         subject_color = st.color_picker("그래프 색상 선택", "#4F8BFF")
 
         submitted = st.form_submit_button("과목 추가")
@@ -138,7 +137,7 @@ else:
 
     st.dataframe(df, hide_index=True)
 
-    # 안전하게 최상위 행 선택 (Index 정밀 수정)
+    # 상단 노출 과목 데이터 추출 (정상 수정)
     top = df.iloc[0]
 
     st.success(
@@ -148,14 +147,20 @@ else:
 
     st.subheader("과목별 추천 공부 시간 그래프")
 
-    # 2번째 방식 연동: 인덱스를 '과목'명으로 매핑하여 정렬 순서대로 차트 빌드
-    chart_df = df.set_index("과목")[["추천 공부 시간(분)"]]
+    # [수정 핵심] 단일 컬럼 구조를 피벗하여 과목별로 색상을 동적 매핑할 수 있게 구조 변경
+    chart_df = df.pivot_table(
+        index=None, 
+        columns="과목", 
+        values="추천 공부 시간(분)", 
+        sort=False
+    )
+    
+    # 정렬된 과목 순서에 맞는 색상 리스트 추출
     chart_colors = df["색상"].tolist()
 
-    # 순수 Streamlit 웹 차트로 렌더링 (확대/축소 지원 및 색상 커스텀 가능)
+    # 에러 없는 순수 웹 표준 인터랙티브 차트 출력
     st.bar_chart(
         chart_df,
-        y="추천 공부 시간(분)",
         color=chart_colors,
         use_container_width=True
     )
