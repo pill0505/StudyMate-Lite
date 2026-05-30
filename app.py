@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
+import altair as alt  # 에러 없는 커스텀 색상 차트를 위해 추가
 
 st.set_page_config(page_title="StudyMate Lite", page_icon="📚", layout="wide")
 
@@ -24,7 +25,8 @@ def urgency_score(d_day):
 
 def calculate_priority(difficulty, weakness, d_day):
     urgency = urgency_score(d_day)
-    score = weakness * 0.5 + difficulty * 0.3 + urgency * 0.2
+    # 난이도와 취약도의 변별력을 높이기 위해 가중치를 조절했습니다.
+    score = weakness * 0.5 + difficulty * 0.4 + urgency * 0.1
     return round(score, 2)
 
 
@@ -127,8 +129,9 @@ else:
     total_priority = sum(r["우선순위 점수"] for r in result)
 
     for r in result:
+        # 난이도/취약도가 다를 때 시간이 똑같이 뭉개지지 않도록 반올림 소수점 단위를 조정했습니다.
         r["추천 공부 시간(분)"] = round(
-            total_minutes * r["우선순위 점수"] / total_priority
+            total_minutes * r["우선순위 점수"] / total_priority, 1
         )
         r["추천 공부 내용"] = r["취약 단원"] + " 개념 정리 + 문제 풀이"
 
@@ -137,30 +140,36 @@ else:
 
     st.dataframe(df, hide_index=True)
 
-    # 상단 노출 과목 데이터 추출 (정상 수정)
+    # 안전하게 첫 번째 과목 추출
     top = df.iloc[0]
 
     st.success(
         f"오늘 가장 먼저 공부할 과목은 **{top['과목']}**입니다. "
-        f"추천 공부 시간은 **{top['추천 공부 시간(분)']}분**입니다."
+        f"추천 공부 시간은 **{int(top['추천 공부 시간(분)'])}분**입니다."
     )
 
     st.subheader("과목별 추천 공부 시간 그래프")
 
-    # [수정 핵심] 단일 컬럼 구조를 피벗하여 과목별로 색상을 동적 매핑할 수 있게 구조 변경
-    chart_df = df.pivot_table(
-        index=None, 
-        columns="과목", 
-        values="추천 공부 시간(분)", 
-        sort=False
-    )
-    
-    # 정렬된 과목 순서에 맞는 색상 리스트 추출
-    chart_colors = df["색상"].tolist()
+    # 고유 색상 리스트 추출
+    unique_subjects = df["과목"].tolist()
+    unique_colors = df["색상"].tolist()
 
-    # 에러 없는 순수 웹 표준 인터랙티브 차트 출력
-    st.bar_chart(
-        chart_df,
-        color=chart_colors,
-        use_container_width=True
+    # 확대/축소 및 개별 커스텀 색상을 완벽하게 동시 지원하는 Altair 차트 생성
+    chart = (
+        alt.Chart(df)
+        .mark_bar()
+        .encode(
+            x=alt.X("과목:N", sort=None, title="과목"),
+            y=alt.Y("추천 공부 시간(분):Q", title="추천 공부 시간(분)"),
+            color=alt.Color(
+                "과목:N",
+                scale=alt.Scale(domain=unique_subjects, range=unique_colors),
+                legend=None,
+            ),
+            tooltip=["과목", "추천 공부 시간(분)", "시험까지"],
+        )
+        .interactive()  # 마우스 스크롤 확대/축소 활성화
+        .properties(width="container", height=400)
     )
+
+    st.altair_chart(chart, use_container_width=True)
