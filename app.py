@@ -1,13 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="StudyMate Lite", page_icon="📚", layout="wide")
-
-# 한글 깨짐 방지 - 윈도우 기준
-plt.rcParams["font.family"] = "Malgun Gothic"
-plt.rcParams["axes.unicode_minus"] = False
 
 
 def calculate_d_day(exam_date):
@@ -61,7 +56,7 @@ with col1:
         difficulty = st.slider("난이도", 1, 5, 3)
         weakness = st.slider("취약도", 1, 5, 3)
         weak_unit = st.text_input("취약 단원", placeholder="예: 함수, 문법, 독해")
-        # 사용자가 선택한 색상이 저장됩니다.
+        # 사용자가 선택한 색상을 수집합니다
         subject_color = st.color_picker("그래프 색상 선택", "#4F8BFF")
 
         submitted = st.form_submit_button("과목 추가")
@@ -141,9 +136,9 @@ else:
     df = pd.DataFrame(result)
     df = df.sort_values(by="우선순위 점수", ascending=False)
 
-    # 1. 안내 테이블에서 색상 열은 제외하고 출력하여 깔끔하게 보여줍니다.
-    st.dataframe(df.drop(columns=["색상"]), hide_index=True)
+    st.dataframe(df, hide_index=True)
 
+    # 안전하게 최상위 행 선택 (Index 정밀 수정)
     top = df.iloc[0]
 
     st.success(
@@ -153,32 +148,14 @@ else:
 
     st.subheader("과목별 추천 공부 시간 그래프")
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    # 2번째 방식 연동: 인덱스를 '과목'명으로 매핑하여 정렬 순서대로 차트 빌드
+    chart_df = df.set_index("과목")[["추천 공부 시간(분)"]]
+    chart_colors = df["색상"].tolist()
 
-    # 2. 정렬된 데이터프레임의 색상 리스트를 바 그래프에 적용합니다.
-    bars = ax.bar(
-        df["과목"],
-        df["추천 공부 시간(분)"],
-        color=df["색상"].tolist()
+    # 순수 Streamlit 웹 차트로 렌더링 (확대/축소 지원 및 색상 커스텀 가능)
+    st.bar_chart(
+        chart_df,
+        y="추천 공부 시간(분)",
+        color=chart_colors,
+        use_container_width=True
     )
-
-    # 3. 그래프 바 상단에 공부 시간(분) 숫자가 표시되도록 추가
-    for bar in bars:
-        height = bar.get_height()
-        ax.text(
-            bar.get_x() + bar.get_width()/2.0, 
-            height + 1, 
-            f'{int(height)}분', 
-            ha='center', 
-            va='bottom', 
-            fontsize=10
-        )
-
-    ax.set_xlabel("과목")
-    ax.set_ylabel("추천 공부 시간(분)")
-    ax.set_title("과목별 추천 공부 시간")
-    
-    # Y축 여유 공간 확보
-    ax.set_ylim(0, df["추천 공부 시간(분)"].max() * 1.15)
-
-    st.pyplot(fig)
